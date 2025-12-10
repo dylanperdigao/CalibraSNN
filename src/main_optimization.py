@@ -17,16 +17,11 @@ from optuna.storages import RetryFailedTrialCallback
 from optuna.pruners import ThresholdPruner
 from optuna.samplers import TPESampler
 
-# add modules to the path
-import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-
 import sys
 sys.path.append(os.path.dirname(os.path.realpath(__file__))+"/../")
-from modules.models import ModelSNN, FFSNN, FFNN, CSNN, CNN
-from modules.other.utils import read_data, experimental_print
+from modules.models import FFSNN, FFNN, CSNN, CNN
+from modules.other.utils import read_data
 
-MACHINE_NAME = os.uname()[1] if "crai" in os.uname()[1] else "local"
 BASE_SEED = None
 
 # Other
@@ -44,15 +39,15 @@ def fix_seeds(seed):
             seed number
     """
     os.environ["PYTHONHASHSEED"] = str(seed)
-    numpy_seed(seed) # numpy.random.seed(seed)
-    random_seed(seed) # random.seed(seed)
-    torch_seed(seed) # torch.manual_seed(seed)
-    torch_cuda_seed(seed) # torch.cuda.manual_seed(seed)
-    torch_cuda_all_seed(seed) # torch.cuda.manual_seed_all(seed)
-    torch_mps_seed(seed) # torch.mps.manual_seed(seed)
-    torch_cudnn.deterministic = True # torch.backends.cudnn.deterministic = True
-    torch_cudnn.benchmark = False # torch.backends.cudnn.benchmark = False
-    torch_use_deterministic_algorithms(True) # torch.use_deterministic_algorithms(True)
+    numpy_seed(seed) 
+    random_seed(seed) 
+    torch_seed(seed) 
+    torch_cuda_seed(seed) 
+    torch_cuda_all_seed(seed) 
+    torch_mps_seed(seed) 
+    torch_cudnn.deterministic = True 
+    torch_cudnn.benchmark = False
+    torch_use_deterministic_algorithms(True) 
 
 
 def optimize_parameters(trial, dataset_name, train_dfs, test_dfs, hyperparameters):
@@ -80,10 +75,19 @@ def optimize_parameters(trial, dataset_name, train_dfs, test_dfs, hyperparameter
     batch_size = trial.suggest_categorical('batch', [2**i for i in range(8, 11)]) if hyperparameters['batch'] is None else hyperparameters['batch']
     num_epochs = trial.suggest_int('epoch', 1, 10) if hyperparameters['epoch'] is None else hyperparameters['epoch']
     weight_minority_class = trial.suggest_float('weight', 0.95, 1, step=0.00001) if hyperparameters['weight'] is None else hyperparameters['weight']
-    class_weights = (1-weight_minority_class, weight_minority_class) 
     adam_betas = tuple(trial.suggest_float(f'adam_beta{i+1}', 0.97, 0.99, step=0.00001) for i in range(2)) if hyperparameters['adam_beta'] is None else hyperparameters['adam_beta']
     learning_rate = trial.suggest_float('learning_rate', 1e-6, 1e-3, step=0.00001) if hyperparameters['learning_rate'] is None else hyperparameters['learning_rate']
-    if "SNN" in MODEL:
+    if "FFNN" in MODEL or "CNN" in MODEL:
+        hyperparameters = {
+            "name": hyperparameters['name'],
+            "topology": hyperparameters['topology'],
+            "batch": batch_size,
+            "epoch": num_epochs,
+            "weight": weight_minority_class,
+            "adam_beta": adam_betas,
+            "learning_rate": learning_rate
+        }
+    else:
         num_steps = trial.suggest_int('step', 1, 25, step=1) if hyperparameters['step'] is None else hyperparameters['step']
         betas = tuple(trial.suggest_float(f'beta{i+1}', 0.1, 1, step=0.00001) for i in range(layers)) if hyperparameters['beta'] is None else hyperparameters['beta']
         slope = trial.suggest_int('slope', 10, 90, step=1) if hyperparameters['slope'] is None else hyperparameters['slope']
@@ -101,39 +105,17 @@ def optimize_parameters(trial, dataset_name, train_dfs, test_dfs, hyperparameter
             "adam_beta": adam_betas,
             "learning_rate": learning_rate
         }
-    else:
-        hyperparameters = {
-            "name": hyperparameters['name'],
-            "topology": hyperparameters['topology'],
-            "batch": batch_size,
-            "epoch": num_epochs,
-            "weight": weight_minority_class,
-            "adam_beta": adam_betas,
-            "learning_rate": learning_rate
-        }
     train_df = train_dfs[dataset_name].iloc[:, :32]
     test_df = test_dfs[dataset_name].iloc[:, :32]
-
     x_train = train_df.drop(columns=["fraud_bool"])
     y_train = train_df["fraud_bool"]
     x_test = test_df.drop(columns=["fraud_bool"])
     y_test = test_df["fraud_bool"]
-
     num_classes = len(np.unique(y_train))
     num_features = len(x_train.columns)
     print(f"Num classes: {num_classes} Num features: {num_features}")
-    # SEEDS
-    #fix_seeds(trial.number)
     if MODEL == "FFSNN" or MODEL == "FCSNN":
         model = FFSNN(
-            num_features=num_features,
-            num_classes=num_classes,
-            hyperparameters=hyperparameters,
-            gpu_number=int(trial.number)%3,
-            verbose=0
-        )
-    elif MODEL == "CSNN":
-        model = CSNN(
             num_features=num_features,
             num_classes=num_classes,
             hyperparameters=hyperparameters,
@@ -156,21 +138,11 @@ def optimize_parameters(trial, dataset_name, train_dfs, test_dfs, hyperparameter
             gpu_number=int(trial.number)%3,
             verbose=0
         )
-    else:
-        model = ModelSNN(
+    else: # CSNN
+        model = CSNN(
             num_features=num_features,
             num_classes=num_classes,
-            architecture=hyperparameters['name'],
-            topology=hyperparameters['topology'],
-            class_weights=class_weights,
-            betas=betas,
-            slope=slope,
-            thresholds=thresholds,
-            batch_size=batch_size,
-            num_epochs=num_epochs,
-            num_steps=num_steps,
-            adam_betas=adam_betas,
-            learning_rate=learning_rate,
+            hyperparameters=hyperparameters,
             gpu_number=int(trial.number)%3,
             verbose=0
         )
@@ -195,7 +167,7 @@ def optimize_parameters(trial, dataset_name, train_dfs, test_dfs, hyperparameter
     metrics.update({k+"_income": v for k, v in fairness_income.items()})
     fairness_employement = model.evaluate_fairness(x_test, targets, predictions, "employment_status", 3)
     metrics.update({k+"_employment": v for k, v in fairness_employement.items()})
-    experimental_print(f'[{hyperparameters["name"]}] Trial {trial.number}: Recall–{metrics["recall"]*100:.1f}% FPR–{metrics["fpr"]*100:.1f}%') if (metrics["recall"]>0.4 and metrics["fpr"]<0.05) else None
+    print(f'[{hyperparameters["name"]}] Trial {trial.number}: Recall–{metrics["recall"]*100:.1f}% FPR–{metrics["fpr"]*100:.1f}%') if (metrics["recall"]>0.4 and metrics["fpr"]<0.05) else None
     trial.set_user_attr("@global accuracy", metrics["accuracy"])
     trial.set_user_attr("@global precision", metrics["precision"])
     trial.set_user_attr("@global recall", metrics["recall"])
@@ -218,11 +190,11 @@ def optimize_parameters(trial, dataset_name, train_dfs, test_dfs, hyperparameter
     return objectives
 
 def main(datasets_list, study_name, trials_optuna, sampler, objective, hyperparameters):
-    base_path = f"{PATH}/../../data/"
+    base_path = f"{PATH}/../data/"
     _, datasets, train_dfs, test_dfs = read_data(base_path, datasets_list, seed=BASE_SEED)
     for dataset_name in datasets.keys(): 
         storage = optuna.storages.RDBStorage(
-            url=f"sqlite:///dgp-{MACHINE_NAME}-nov.db",
+            url=f"sqlite:///TEST.db",
             heartbeat_interval=60,
             grace_period=120,
             failed_trial_callback=RetryFailedTrialCallback(max_retry=3),
@@ -246,52 +218,47 @@ def main(datasets_list, study_name, trials_optuna, sampler, objective, hyperpara
 
 
 if __name__ == "__main__":
-    if MACHINE_NAME == "crai01":
-        ##SM_1H_K2 = ("SM_1H_K2", [(1, 16, 2), (16, 32, 2), (224, 2)])
-        ##SM_1H_K3 = ("SM_1H_K3", [(1, 16, 3), (16, 32, 3), (192, 2)])
-        ##SM_1H_K4 = ("SM_1H_K4", [(1, 16, 4), (16, 32, 4), (160, 2)])
-        ##SM_1H_K5 = ("SM_1H_K5", [(1, 16, 5), (16, 32, 5), (128, 2)])
-        ##MM_1H_K2 = ("MM_1H_K2", [(1, 32, 2), (32, 64, 2), (448, 2)])
-        ##MM_1H_K3 = ("MM_1H_K3", [(1, 32, 3), (32, 64, 3), (384, 2)])
-        ##MM_1H_K4 = ("MM_1H_K4", [(1, 32, 4), (32, 64, 4), (320, 2)])
-        ##MM_1H_K5 = ("MM_1H_K5", [(1, 32, 5), (32, 64, 5), (256, 2)])
-        ##LM_1H_K2 = ("LM_1H_K2", [(1, 64, 2), (64, 128, 2), (896, 2)])
-        ##LM_1H_K3 = ("LM_1H_K3", [(1, 64, 3), (64, 128, 3), (768, 2)])
-        ##LM_1H_K4 = ("LM_1H_K4", [(1, 64, 4), (64, 128, 4), (640, 2)])
-        ##LM_1H_K5 = ("LM_1H_K5", [(1, 64, 5), (64, 128, 5), (512, 2)])
-        
-        FCM_1H = ("FCSNN_1H", (31, 64, 2))
-        FCM_2H = ("FCSNN_2H", (31, 64, 64, 2))
-        FCM_3H = ("FCSNN_3H", (31, 64, 64, 64, 2))
-        topology = FCM_2H
-
-    elif MACHINE_NAME == "crai02":
-        ##SM_2H_K2 = ("SM_2H_K2", [(1, 16, 2), (16, 32, 2), (32, 64, 2), (192, 2)])
-        ##SM_2H_K3 = ("SM_2H_K3", [(1, 16, 3), (16, 32, 3), (32, 64, 3), (128, 2)])
-        ##SM_2H_K4 = ("SM_2H_K4", [(1, 16, 4), (16, 32, 4), (32, 64, 4), (64, 2)])
-        ##MM_2H_K2 = ("MM_2H_K2", [(1, 32, 2), (32, 64, 2), (64, 128, 2), (384, 2)])
-        ##MM_2H_K3 = ("MM_2H_K3", [(1, 32, 3), (32, 64, 3), (64, 128, 3), (256, 2)])
-        ##MM_2H_K4 = ("MM_2H_K4", [(1, 32, 4), (32, 64, 4), (64, 128, 4), (128, 2)])
-        ##LM_2H_K2 = ("LM_2H_K2", [(1, 64, 2), (64, 128, 2), (128, 256, 2), (768, 2)])
-        ##topology = LM_2H_K2
-        #CNN_1H = ("CNN_1H", [(1, 64, 2), (64, 128, 2), (896, 2)])
-        #CNN_2H = ("CNN_2H", [(1, 64, 2), (64, 128, 2), (128, 256, 2), (768, 2)])
-        #CNN_3H = ("CNN_3H", [(1, 64, 2), (64, 128, 2), (128, 256, 2), (256, 512, 2), (512, 2)])
-        #topology = CNN_3H
-        FFM_1H = ("FFNN_1H-sigmoid", (31, 64, 2))
-        FFM_2H = ("FFNN_2H-sigmoid", (31, 64, 64, 2))
-        FFM_3H = ("FFNN_3H-sigmoid", (31, 64, 64, 64, 2))
-        topology = FFM_1H
-    elif MACHINE_NAME == "crai03":
-        ##SM_3H_K2 = ("SM_3H_K2", [(1, 16, 2), (16, 32, 2), (32, 64, 2), (64, 128, 2), (128, 2)])
-        ##MM_3H_K2 = ("MM_3H_K2", [(1, 32, 2), (32, 64, 2), (64, 128, 2), (128, 256, 2), (256, 2)])
-        ##LM_3H_K2 = ("LM_3H_K2", [(1, 64, 2), (64, 128, 2), (128, 256, 2), (256, 512, 2), (512, 2)])
-        ##LM_2H_K4 = ("LM_2H_K4", [(1, 64, 4), (64, 128, 4), (128, 256, 4), (256, 2)])
-        ##LM_2H_K3 = ("LM_2H_K3", [(1, 64, 3), (64, 128, 3), (128, 256, 3), (512, 2)])
-        ##topology = LM_2H_K4
-        pass
-    else:
-        raise("Unknown machine")
+    topology = ("SM_1H_K2", [(1, 16, 2), (16, 32, 2), (224, 2)])
+    """
+    topology = ("SM_1H_K2", [(1, 16, 2), (16, 32, 2), (224, 2)])
+    topology = ("SM_1H_K3", [(1, 16, 3), (16, 32, 3), (224, 3)])
+    topology = ("SM_1H_K4", [(1, 16, 4), (16, 32, 4), (224, 4)])
+    topology = ("SM_1H_K5", [(1, 16, 5), (16, 32, 5), (224, 5)])
+    topology = ("SM_2H_K2", [(1, 16, 2), (16, 32, 2), (32, 64, 2), (192, 2)])
+    topology = ("SM_2H_K3", [(1, 16, 3), (16, 32, 3), (32, 64, 3), (192, 3)])
+    topology = ("SM_2H_K4", [(1, 16, 4), (16, 32, 4), (32, 64, 4), (192, 4)])
+    topology = ("SM_3H_K2", [(1, 16, 2), (16, 32, 2), (32, 64, 2), (64, 128, 2), (128, 2)])
+    #
+    topology = ("MM_1H_K2", [(1, 32, 2), (32, 64, 2), (448, 2)])
+    topology = ("MM_1H_K3", [(1, 32, 3), (32, 64, 3), (448, 3)])
+    topology = ("MM_1H_K4", [(1, 32, 4), (32, 64, 4), (448, 4)])
+    topology = ("MM_1H_K5", [(1, 32, 5), (32, 64, 5), (448, 5)])
+    topology = ("MM_2H_K2", [(1, 32, 2), (32, 64, 2), (64, 128, 2), (384, 2)])
+    topology = ("MM_2H_K3", [(1, 32, 3), (32, 64, 3), (64, 128, 3), (384, 3)])
+    topology = ("MM_2H_K4", [(1, 32, 4), (32, 64, 4), (64, 128, 4), (384, 4)])
+    topology = ("MM_3H_K2", [(1, 32, 2), (32, 64, 2), (64, 128, 2), (128, 256, 2), (512, 2)])
+    #
+    topology = ("LM_1H_K2", [(1, 64, 2), (64, 128, 2), (896, 2)])
+    topology = ("LM_1H_K3", [(1, 64, 3), (64, 128, 3), (896, 3)])
+    topology = ("LM_1H_K4", [(1, 64, 4), (64, 128, 4), (896, 4)])
+    topology = ("LM_1H_K5", [(1, 64, 5), (64, 128, 5), (896, 5)])
+    topology = ("LM_2H_K2", [(1, 64, 2), (64, 128, 2), (128, 256, 2), (768, 2)])
+    topology = ("LM_2H_K3", [(1, 64, 3), (64, 128, 3), (128, 256, 3), (768, 3)])
+    topology = ("LM_2H_K4", [(1, 64, 4), (64, 128, 4), (128, 256, 4), (768, 4)])
+    topology = ("LM_3H_K2", [(1, 64, 2), (64, 128, 2), (128, 256, 2), (256, 512, 2), (512, 2)])
+    #
+    topology = ("CNN_1H", [(1, 64, 2), (64, 128, 2), (896, 2)])
+    topology = ("CNN_2H", [(1, 64, 2), (64, 128, 2), (128, 256, 2), (768 , 2)])
+    topology = ("CNN_3H", [(1, 64, 2), (64, 128, 2), (128, 256, 2), (256, 512, 2), (512, 2)])
+    #
+    topology = ("FFSNN_1H", [64, 128, 2])
+    topology = ("FFSNN_2H", [64, 128, 256, 2])
+    topology = ("FFSNN_3H", [64, 128, 256, 512, 2])
+    #
+    topology = ("FFNN_1H", [64, 128, 2])
+    topology = ("FFNN_2H", [64, 128, 256, 2])
+    topology = ("FFNN_3H", [64, 128, 256, 512, 2])
+    """
     MODEL = topology[0].split("_")[0]
     HYPERPARAMETERS = {
         "name": topology[0], 
@@ -307,7 +274,7 @@ if __name__ == "__main__":
         "learning_rate": None
     }
     DATASETS = ["Base"]
-    STUDY_NAME = f"20241108-{HYPERPARAMETERS['name']}"
+    STUDY_NAME = f"TEST-{HYPERPARAMETERS['name']}"
     TRIALS_OPTUNA = 1050
     SAMPLER = TPESampler()
     OBJECTIVE = [("minimize","fpr"), ("maximize","recall")]

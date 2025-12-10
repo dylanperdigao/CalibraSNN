@@ -17,15 +17,14 @@ def evaluate(y_test, predicted):
         precision (float): precision of the model 
         recall (float): recall of the model 
         fpr (float): false positive rate of the model 
+        tnr (float): true negative rate of the model
         f1_score (float): f1 score of the model 
         auc (float): area under the curve of the model 
     """
-    # Evaluate the model
     y_pred = []
     y_true = []
     y_pred.extend(predicted)
     y_true.extend(y_test)
-    # Build confusion matrix
     cm = confusion_matrix(y_true, y_pred)
     tn, fp, fn, tp = cm.ravel()
     accuracy = 0 if (tp + tn + fp + fn)==0 else (tp + tn) / (tp + tn + fp + fn)

@@ -3,7 +3,6 @@ import torch
 
 from torch.nn import CrossEntropyLoss
 from snntorch.surrogate import fast_sigmoid
-from modules.other.utils import experimental_print
 from modules.models.BaseModel import BaseModel
 
 class BaseModelSNN(BaseModel):
@@ -35,7 +34,7 @@ class BaseModelSNN(BaseModel):
             f"- Learning rate: {self.learning_rate}",
             "======================================="
         ]
-        experimental_print("\n".join(print_str)) if self.verbose >= 1 else None
+        print("\n".join(print_str)) if self.verbose >= 1 else None
 
     def fit(self, x_train, y_train):
         """Training loop for the network.
@@ -50,7 +49,7 @@ class BaseModelSNN(BaseModel):
         """
         self._train_loader = self.load_data(x_train, y_train)
         for epoch in range(self.hyperparameters['epoch']):
-            experimental_print(f"Epoch - {epoch}") if self.verbose >= 2 else None
+            print(f"Epoch - {epoch}") if self.verbose >= 2 else None
             train_batch = iter(self._train_loader)
             for data, targets in train_batch:
                 data = data.to(self.device)
@@ -63,12 +62,12 @@ class BaseModelSNN(BaseModel):
                 self.optimizer.zero_grad()
                 loss_val.backward()
                 self.optimizer.step()
-                experimental_print(f"Loss: {loss_val.item()}") if self.verbose >= 3 else None
+                print(f"Loss: {loss_val.item()}") if self.verbose >= 3 else None
                
 
 
     def predict(self, x_test, y_test):
-        experimental_print("Predicting...") if self.verbose >= 2 else None
+        print("Predicting...") if self.verbose >= 2 else None
         self._test_loader = self.load_data(x_test, y_test)
         predictions = np.array([])
         test_targets = np.array([])

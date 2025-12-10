@@ -3,7 +3,6 @@ import torch
 import torch.nn as nn
 
 from modules.networks.csnn.BaseNet_CSNN import BaseNet_CSNN
-#from BaseNet_CSNN import BaseNet_CSNN
 
 class Net_CSNN_2conv(nn.Module, BaseNet_CSNN):
     """
@@ -84,29 +83,3 @@ class Net_CSNN_2conv(nn.Module, BaseNet_CSNN):
             spk_last_rec.append(spk3)
             mem_last_rec.append(mem3)
         return torch.stack(cur_last_rec), torch.stack(spk_last_rec), torch.stack(mem_last_rec)
-    
-    
-if __name__ == "__main__":
-    SM_1H_K2 = [(1, 16, 2), (16, 32, 2), (64, 2)]
-    SM_1H_K3 = [(1, 16, 3), (16, 32, 3), (64, 2)]
-    SM_1H_K5 = [(1, 16, 5), (16, 32, 5), (64, 2)]
-    MM_1H_K2 = [(1, 32, 2), (32, 64, 2), (128, 2)]
-    MM_1H_K3 = [(1, 32, 3), (32, 64, 3), (128, 2)]
-    MM_1H_K5 = [(1, 32, 5), (32, 64, 5), (128, 2)]
-    LM_1H_K2 = [(1, 64, 2), (64, 128, 2), (256, 2)]
-    LM_1H_K3 = [(1, 64, 3), (64, 128, 3), (256, 2)]
-    LM_1H_K5 = [(1, 64, 5), (64, 128, 5), (256, 2)]
-    TOPOLOGIES = [SM_1H_K2, MM_1H_K2, LM_1H_K2]
-    PARAMETERS = {
-        'beta': [0.9, 0.9, 0.9],
-        'slope': 100.0,
-        'step': 100,
-        'threshold': [1.0, 1.0, 1.0]
-    }
-    for topology in TOPOLOGIES:
-        model = Net_CSNN_2conv(
-            topology=topology,
-            params=PARAMETERS
-        )
-        print(model.get_num_params())
-        print(model.get_architecture())

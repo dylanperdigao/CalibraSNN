@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from modules.networks.cnn.BaseNet_CNN import BaseNet_CNN
-#from BaseNet_CNN import BaseNet_CNN
 
 class Net_CNN_2conv(nn.Module, BaseNet_CNN):
     """

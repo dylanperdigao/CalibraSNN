@@ -3,7 +3,6 @@ import torch
 from torch import from_numpy
 from torch.utils.data import DataLoader
 from modules.dataset.DatasetBAF import DatasetBAF
-from modules.other.utils import experimental_print
 from modules.metrics import evaluate, evaluate_business_constraint, evaluate_fairness
 
 class BaseModel(object):
@@ -20,6 +19,7 @@ class BaseModel(object):
                 device = torch.device("cuda")
         elif torch.backends.mps.is_available():
             device = torch.device("mps")
+            print("Using MPS.")
         else:
             print("No GPU available, using CPU.")
         self.num_features = num_features
@@ -71,7 +71,7 @@ class BaseModel(object):
             f'AUC:\t\t{metrics["auc"]*100:.4f}%',
             "=======================================",
         ]
-        experimental_print("\n".join(print_str)) if self.verbose >= 1 and (metrics["recall"]>0.1 and metrics["fpr"]<0.1) else None
+        print("\n".join(print_str)) if self.verbose >= 1 and (metrics["recall"]>0.1 and metrics["fpr"]<0.1) else None
         return metrics
     
     def evaluate_business_constraint(self, y_test, predictions):
@@ -103,7 +103,7 @@ class BaseModel(object):
             f'F1-Score@5FPR:\t{metrics["f1_score@5FPR"]*100:.4f}%',
             "=======================================",
         ]
-        experimental_print("\n".join(print_str)) if self.verbose >= 1 and (metrics["recall@5FPR"]>0.1 and metrics["fpr@5FPR"]<0.1) else None
+        print("\n".join(print_str)) if self.verbose >= 1 and (metrics["recall@5FPR"]>0.1 and metrics["fpr@5FPR"]<0.1) else None
         return metrics
     
     def evaluate_fairness(self, x_test, y_test, predictions, sensitive_attribute, attribute_threshold):
@@ -135,7 +135,7 @@ class BaseModel(object):
             f'FNR Ratio:\t{metrics["fnr_ratio"]*100:.4f}',
             "=======================================",
         ]
-        experimental_print("\n".join(print_str)) if self.verbose >= 1 and (metrics["recall_older"]>0.1 and metrics["fpr_older"]<0.1) else None
+        print("\n".join(print_str)) if self.verbose >= 1 and (metrics["recall_older"]>0.1 and metrics["fpr_older"]<0.1) else None
         return metrics
     
     def get_parameters(self):

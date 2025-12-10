@@ -3,18 +3,18 @@ import os
 import time 
 
 from datetime import datetime
-from pyJoules.device import Device, DeviceFactory
+from pyJoules.device import DeviceFactory
 from pyJoules.device.nvidia_device import NvidiaGPUDomain
 from pyJoules.energy_meter import EnergyMeter
 
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
-from modules.other.random_search import RandomValueTrial
-from modules.other.utils import read_data, experimental_print
+sys.path.append(os.path.dirname(os.path.realpath(__file__))+"/../")
+from modules.other.utils import RandomTrial
+from modules.other.utils import read_data
 from modules.other import hyperparameters
 from modules.models import  FFSNN, CSNN, FFNN, CNN
 
-DATASET_LIST = ["Base", "Variant I", "Variant II","Variant III", "Variant IV", "Variant V"]
+DATASET_LIST = ["Base", "TypeI", "TypeII","TypeIII", "TypeIV", "TypeV"]
 NUM_TRIALS = 100
 BEGIN_TRIAL = 0
 BASE_SEED = 42
@@ -25,33 +25,32 @@ METRICS_NAME_GLOBAL = ["accuracy", "precision", "recall", "fpr", "f1_score","auc
 METRICS_NAME_5FPR = ["accuracy@5FPR","precision@5FPR", "recall@5FPR", "fpr@5FPR", "f1_score@5FPR"]
 METRICS_FAIRNESS = ["fpr_ratio_age", "fpr_ratio_income", "fpr_ratio_employment"]
 
-MODEL = "FFSNN"
 GPU_NUMBER = 2
+MODEL = "CNN"
 HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_CNN_1H
-#HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_CNN_2H
-##HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_CNN_3H
-
-##HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_FFNN_1H
-##HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_FFNN_2H
-##HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_FFNN_3H
-
-##HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_FFSNN_1H
-##HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_FFSNN_2H
-##HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_FFSNN_3H
-
-##HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_SM_1H
-##HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_SM_2H
-##HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_SM_3H
-##HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_MM_1H
-##HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_MM_2H
-##HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_MM_3H
-##HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_LM_1H
-##HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_LM_2H
-##HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_LM_3H
-
-EXPERIMENT_NAME = f"ECML2025-{HYPERPARAMETERS['architecture']}-{NUM_TRIALS}trials-begin{BEGIN_TRIAL}"
+"""
+HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_CNN_1H
+HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_CNN_2H
+HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_CNN_3H
+HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_FFNN_1H
+HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_FFNN_2H
+HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_FFNN_3H
+HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_FFSNN_1H
+HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_FFSNN_2H
+HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_FFSNN_3H
+HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_SM_1H
+HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_SM_2H
+HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_SM_3H
+HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_MM_1H
+HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_MM_2H
+HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_MM_3H
+HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_LM_1H
+HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_LM_2H
+HYPERPARAMETERS = hyperparameters.HYPERPARAMETERS_LM_3H
+"""
+EXPERIMENT_NAME = f"TEST-{HYPERPARAMETERS['architecture']}-{NUM_TRIALS}trials-begin{BEGIN_TRIAL}"
 FIXED_DATE = None 
-MEASURE_ENERGY = True
+MEASURE_ENERGY = False
 
 
 def dataset_loop(train_dfs, test_dfs, dataset_name, trial_number, seed, path, runs):
@@ -159,7 +158,7 @@ def dataset_loop(train_dfs, test_dfs, dataset_name, trial_number, seed, path, ru
     prev_runs.append(results)
     runs[dataset_name] = prev_runs
     try:
-        experimental_print(f"[{HYPERPARAMETERS['architecture']}] TPR@5FPR: {results['recall@5FPR']:.2f} – PE age: {results['fpr_ratio_age']:.2f}")
+        print(f"[{HYPERPARAMETERS['architecture']}] TPR@5FPR: {results['recall@5FPR']:.2f} – PE age: {results['fpr_ratio_age']:.2f}")
     except:
         pass
     return runs
@@ -171,7 +170,7 @@ def simulation(datasets, train_dfs, test_dfs, path="./results.csv"):
     for trial in range(NUM_TRIALS):
         seed = seeds[trial]
         trial_number = trial
-        trial = RandomValueTrial(seed=seed)
+        trial = RandomTrial(seed=seed)
         if trial_number < BEGIN_TRIAL:
             print(f"Skipping trial {trial_number} – seed {seed}")
             continue
@@ -180,13 +179,13 @@ def simulation(datasets, train_dfs, test_dfs, path="./results.csv"):
             dataset_loop(train_dfs, test_dfs, dataset_name, trial_number, seed, path, runs) 
 
 def main():
-    base_path = f"{PATH}/../../data/"
+    base_path = f"{PATH}/../data/"
     _, datasets, train_dfs, test_dfs = read_data(base_path, DATASET_LIST)
     if not FIXED_DATE:
         date = datetime.now().strftime("%Y%m%d_%H%M%S")
     else:
         date = FIXED_DATE
-    experiment_dir = f"{PATH}/results/"
+    experiment_dir = f"{PATH}/../results/"
     results_path = f"{experiment_dir}/{date}-{EXPERIMENT_NAME}.csv"
     os.makedirs(experiment_dir, exist_ok=True)
     if not os.path.exists(results_path):

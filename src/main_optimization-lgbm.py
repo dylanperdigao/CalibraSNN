@@ -9,17 +9,11 @@ from optuna.storages import RetryFailedTrialCallback
 from optuna.pruners import ThresholdPruner
 from optuna.samplers import TPESampler
 
-
-# add modules to the path
-import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-
 import sys
 sys.path.append(os.path.dirname(os.path.realpath(__file__))+"/../")
-from modules.other.utils import read_data, experimental_print
+from modules.other.utils import read_data
 from modules.metrics import evaluate, evaluate_fairness, evaluate_business_constraint
 
-MACHINE_NAME = os.uname()[1] if "crai" in os.uname()[1] else "local"
 BASE_SEED = None
 
 # Other
@@ -29,9 +23,6 @@ PATH = os.path.dirname(os.path.realpath(__file__))
 print("PATH",PATH)
 
 def optimize_parameters(trial, dataset_name, train_dfs, test_dfs):
-    #################################################
-    # Optimize the hyperparameters for the experiment.
-    #################################################
     print(f"Trial {trial.number} – GPU {int(trial.number)%3}")
     n_estimators = trial.suggest_int("n_estimators", 20, 10000, log=True)
     max_depth = trial.suggest_int("max_depth", 3, 30)
@@ -55,7 +46,6 @@ def optimize_parameters(trial, dataset_name, train_dfs, test_dfs):
     train_df = train_dfs[dataset_name].iloc[:, :32]
     test_df = test_dfs[dataset_name].iloc[:, :32]
 
-    # rebalance data
     x_train = train_df.drop(columns=["fraud_bool"])
     y_train = train_df["fraud_bool"]
     x_test = test_df.drop(columns=["fraud_bool"])
@@ -63,20 +53,14 @@ def optimize_parameters(trial, dataset_name, train_dfs, test_dfs):
 
     model = lgbm.LGBMClassifier(n_jobs=5, **hyperparameters, verbose=-1) 
 
-    #predictions = model.fit_predict(x_train, y_train, x_test, y_test)
-    # Train the model
     fit_time = time.time()
     model.fit(x_train, y_train, categorical_feature=["payment_type","employment_status","housing_status","source","device_os"])
     trial.set_user_attr("@time train", time.time()-fit_time)
-    # Evaluate the model
     inference_time = time.time()
     predictions = model.predict(x_test)
     trial.set_user_attr("@time inference", time.time()-inference_time)
-    #predictions_proba = model.predict_proba(x_test)[:, 1]
-    # ETA
     eta = (TRIALS_OPTUNA*(time.time()-fit_time)-trial.number*(time.time()-fit_time))/3600
     print(f"ETA: {eta/24:.0f}d {eta%24:.0f}h {eta%1*60:.0f}m")
-    # Metrics
     metrics = evaluate(y_test, predictions)
     metrics_aequitas = evaluate_business_constraint(y_test, predictions)
     metrics.update(metrics_aequitas)
@@ -86,7 +70,7 @@ def optimize_parameters(trial, dataset_name, train_dfs, test_dfs):
     metrics.update({k+"_income": v for k, v in fairness_income.items()})
     fairness_employement = evaluate_fairness(x_test, y_test, predictions, "employment_status", 3)
     metrics.update({k+"_employment": v for k, v in fairness_employement.items()})
-    experimental_print(f'Trial {trial.number}: Recall–{metrics["recall"]*100:.1f}% FPR–{metrics["fpr"]*100:.1f}%') if (metrics["recall"]>0.4 and metrics["fpr"]<0.1) else None
+    print(f'Trial {trial.number}: Recall–{metrics["recall"]*100:.1f}% FPR–{metrics["fpr"]*100:.1f}%') if (metrics["recall"]>0.4 and metrics["fpr"]<0.1) else None
     trial.set_user_attr("@global accuracy", metrics["accuracy"])
     trial.set_user_attr("@global precision", metrics["precision"])
     trial.set_user_attr("@global recall", metrics["recall"])
@@ -107,11 +91,11 @@ def optimize_parameters(trial, dataset_name, train_dfs, test_dfs):
     return [metrics[y] for (_,y) in OBJECTIVE]
 
 def main(datasets_list, study_name, trials_optuna, sampler, objective):
-    base_path = f"{PATH}/../../data/"
+    base_path = f"{PATH}/../data/"
     _, datasets, train_dfs, test_dfs = read_data(base_path, datasets_list, seed=BASE_SEED)
     for dataset_name in datasets.keys(): 
         storage = optuna.storages.RDBStorage(
-            url=f"sqlite:///dgp-{MACHINE_NAME}-oct.db",
+            url="sqlite:///TEST.db",
             heartbeat_interval=60,
             grace_period=120,
             failed_trial_callback=RetryFailedTrialCallback(max_retry=3),
@@ -137,7 +121,7 @@ def main(datasets_list, study_name, trials_optuna, sampler, objective):
 if __name__ == "__main__":
     
     DATASETS = ["Base"]
-    STUDY_NAME = f"20241001-LightGBM-{DATASETS[0]}-minFPR_maxRecall"
+    STUDY_NAME = f"TEST-LightGBM-{DATASETS[0]}"
     TRIALS_OPTUNA = 1000
     SAMPLER = TPESampler()
     OBJECTIVE = [("minimize","fpr"), ("maximize","recall")]

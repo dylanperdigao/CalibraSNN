@@ -208,8 +208,9 @@ __marimo__/
 
 # OTHERS
 *.DS_Store
-data/*
-plots/*
-results/*
-tables/*
-*.ipynb
+*data/Base.parquet
+*data/TypeI.parquet
+*data/TypeII.parquet
+*data/TypeIII.parquet
+*data/TypeIV.parquet
+*data/TypeV.parquet

@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import snntorch as snn
-from snntorch.surrogate import fast_sigmoid
 
 from modules.networks.ffsnn.BaseNet_FFSNN import BaseNet_FFSNN
 
@@ -58,18 +57,3 @@ class Net_FFSNN_2h(nn.Module, BaseNet_FFSNN):
             spk_last_rec.append(spk3)
             mem_last_rec.append(mem3)
         return torch.stack(cur_last_rec,dim=0), torch.stack(spk_last_rec, dim=0), torch.stack(mem_last_rec, dim=0)
-    
-if __name__ == "__main__":
-    input_size = 31
-    output_size = 2
-    topology = (input_size, 64, 64, output_size)
-    params = {
-        'beta': (0.9, 0.8, 0.7),
-        'slope': fast_sigmoid(25),
-        'step': 10,
-        'threshold': (0.5, 0.5, 0.5)
-    }
-    model = Net_FFSNN_2h(topology, params)
-    print(model.get_architecture())
-    #print(model.get_parameters())
-    print(f"Number of parameters for {topology}: {model.get_num_params()}")

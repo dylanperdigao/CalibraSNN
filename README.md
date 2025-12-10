@@ -1,6 +1,6 @@
 # CalibraSNN: Fair and Calibrated Convolutional Spiking Neural Network for High-Stakes Industry Applications
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.13546087.svg)](https://doi.org/10.5281/zenodo.13546087)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17886358.svg)]([https://doi.org/10.5281/zenodo.17886358](https://doi.org/10.5281/zenodo.17886358))
 
 Source code of the paper entitled "CalibraSNN: Fair and Calibrated Convolutional Spiking Neural Network for High-Stakes Industry Applications" published at "IEEE Access" journal.
 

@@ -41,9 +41,8 @@ To cite this work, use the following bibtex entry:
   journal={IEEE Access}, 
   title={CalibraSNN: Fair and Calibrated Convolutional Spiking Neural Network for High-Stakes Industry Applications}, 
   year={2025},
-  volume={},
-  number={},
-  pages={1-1},
+  volume={13},
+  pages={210979-210995},
   keywords={Neurons;Artificial intelligence;Spiking neural networks;Energy efficiency;Optimization;Mathematical models;Ions;Computational modeling;Power demand;Hardware;Spiking Neural Network;Neuromorphic Computing;Neural Network Calibration;Imbalanced Data;Fair ML;Green AI;Low-Power ML;High-Stakes Industries},
   doi={10.1109/ACCESS.2025.3641389}
 }
